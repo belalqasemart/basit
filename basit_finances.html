@@ -1,0 +1,909 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>نظام بسيط المحاسبي وإدارة المنتجات</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Alexandria:wght@400;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Alexandria', sans-serif;
+            background-color: #FDFBF6;
+            color: #333;
+        }
+        .tab-active {
+            border-color: #6B7280;
+            background-color: #F3F4F6;
+            color: #1F2937;
+            font-weight: 600;
+        }
+        .tab-inactive {
+            border-color: transparent;
+            color: #6B7280;
+        }
+        .stat-card {
+            background-color: #ffffff;
+            padding: 1.5rem;
+            border-radius: 0.5rem;
+            box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+        }
+        @media print {
+            body * {
+                visibility: hidden;
+            }
+            #po-section, #po-section * {
+                visibility: visible;
+            }
+            #po-section {
+                position: absolute;
+                left: 0;
+                top: 0;
+                width: 100%;
+            }
+            #printPOButton {
+                display: none;
+            }
+            .no-print {
+                display: none;
+            }
+        }
+    </style>
+</head>
+<body class="antialiased">
+
+    <div class="container mx-auto p-4 md:p-8">
+
+        <header class="text-center mb-8 no-print">
+            <div class="flex flex-col items-center">
+                <img src="uploaded:ar-logo@4x.png-ac2b8bcb-1abc-4175-b1f5-857cb656a270" alt="Basit Home Logo" class="w-32 mb-4">
+                <h1 class="text-3xl md:text-4xl font-bold text-gray-800">نظام بسيط المحاسبي</h1>
+                <p class="text-gray-600 mt-2">لوحة تحكم شاملة لإدارة الإيرادات والمصروفات وأوامر الشراء والمنتجات</p>
+            </div>
+        </header>
+
+        <div class="mb-8 border-b border-gray-200 no-print">
+            <nav class="flex -mb-px" aria-label="Tabs">
+                <button id="tab-dashboard" class="tab-active w-1/4 py-4 px-1 text-center border-b-2 font-medium text-sm transition-colors duration-200">
+                    اللوحة الرئيسية
+                </button>
+                <button id="tab-products" class="tab-inactive w-1/4 py-4 px-1 text-center border-b-2 font-medium text-sm transition-colors duration-200">
+                    إدارة المنتجات
+                </button>
+                <button id="tab-po" class="tab-inactive w-1/4 py-4 px-1 text-center border-b-2 font-medium text-sm transition-colors duration-200">
+                    إنشاء أمر شراء (PO)
+                </button>
+                <button id="tab-data" class="tab-inactive w-1/4 py-4 px-1 text-center border-b-2 font-medium text-sm transition-colors duration-200">
+                    إدارة البيانات
+                </button>
+            </nav>
+        </div>
+
+        <main>
+            <div id="content-dashboard">
+                <section id="summary-cards" class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+                    <div class="stat-card">
+                        <span class="text-gray-600">إجمالي الإيرادات</span>
+                        <p id="total-revenues-display" class="text-2xl font-bold text-green-600 mt-1">0.00 جنيه</p>
+                    </div>
+                    <div class="stat-card">
+                        <span class="text-gray-600">إجمالي المصروفات</span>
+                        <p id="total-expenses-display" class="text-2xl font-bold text-red-600 mt-1">0.00 جنيه</p>
+                    </div>
+                    <div class="stat-card">
+                        <span class="text-gray-600">صافي الأرباح</span>
+                        <p id="net-profit-display" class="text-2xl font-bold mt-1 text-gray-800">0.00 جنيه</p>
+                    </div>
+                </section>
+                
+                <section id="data-entry" class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8 bg-white p-6 rounded-lg shadow-sm">
+                    <div>
+                        <h2 class="text-xl font-bold text-gray-700 mb-4">إضافة مصروف جديد</h2>
+                        <form id="expense-form" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <input type="date" id="exp-date" class="p-2 border rounded-md bg-gray-50 focus:ring-2 focus:ring-gray-300" required>
+                            <input type="text" id="exp-desc" placeholder="وصف البند" class="p-2 border rounded-md bg-gray-50 focus:ring-2 focus:ring-gray-300" required>
+                            <select id="exp-category" class="p-2 border rounded-md bg-gray-50 focus:ring-2 focus:ring-gray-300" required>
+                                <option value="تشغيلية">تشغيلية</option>
+                                <option value="تسويقية">تسويقية</option>
+                                <option value="مواد خام">مواد خام</option>
+                                <option value="مرتبات">مرتبات</option>
+                                <option value="أخرى">أخرى</option>
+                            </select>
+                            <input type="number" id="exp-amount" placeholder="المبلغ" min="0" step="0.01" class="p-2 border rounded-md bg-gray-50 focus:ring-2 focus:ring-gray-300" required>
+                            <button type="submit" class="md:col-span-2 w-full bg-red-600 text-white py-2 px-4 rounded-md hover:bg-red-700 transition-colors">إضافة المصروف</button>
+                        </form>
+                    </div>
+                    <div>
+                        <h2 class="text-xl font-bold text-gray-700 mb-4">إضافة إيراد جديد</h2>
+                        <form id="revenue-form" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                             <input type="date" id="rev-date" class="p-2 border rounded-md bg-gray-50 focus:ring-2 focus:ring-gray-300" required>
+                            <input type="text" id="rev-desc" placeholder="وصف الإيراد" class="p-2 border rounded-md bg-gray-50 focus:ring-2 focus:ring-gray-300" required>
+                            <input type="number" id="rev-amount" placeholder="المبلغ" min="0" step="0.01" class="p-2 border rounded-md bg-gray-50 focus:ring-2 focus:ring-gray-300" required>
+                            <select id="rev-category" class="p-2 border rounded-md bg-gray-50 focus:ring-2 focus:ring-gray-300" required>
+                                <option value="مبيعات">مبيعات</option>
+                                <option value="إيرادات أخرى">إيرادات أخرى</option>
+                            </select>
+                            <button type="submit" class="md:col-span-2 w-full bg-green-600 text-white py-2 px-4 rounded-md hover:bg-green-700 transition-colors">إضافة الإيراد</button>
+                        </form>
+                    </div>
+                </section>
+
+                <section id="transactions-log" class="bg-white p-6 rounded-lg shadow-sm">
+                    <h2 class="text-xl font-bold text-gray-700 mb-4">سجل الحركات المالية</h2>
+                    <div class="chart-container h-80 mb-8">
+                        <canvas id="balanceChart"></canvas>
+                    </div>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-sm text-left text-gray-500">
+                            <thead class="text-xs text-gray-700 uppercase bg-gray-100">
+                                <tr>
+                                    <th scope="col" class="px-6 py-3">التاريخ</th>
+                                    <th scope="col" class="px-6 py-3">الوصف</th>
+                                    <th scope="col" class="px-6 py-3">النوع</th>
+                                    <th scope="col" class="px-6 py-3">الفئة</th>
+                                    <th scope="col" class="px-6 py-3">المبلغ</th>
+                                    <th scope="col" class="px-6 py-3"></th>
+                                </tr>
+                            </thead>
+                            <tbody id="transactions-table-body">
+                                <tr class="bg-white border-b"><td colspan="6" class="px-6 py-4 text-center">لا توجد حركات مالية مسجلة بعد.</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </section>
+            </div>
+
+            <div id="content-products" class="hidden">
+                 <section class="mb-8 bg-white p-6 rounded-lg shadow-sm">
+                    <h2 class="text-xl font-bold text-gray-700 mb-4">قائمة المنتجات</h2>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-sm text-left text-gray-500">
+                            <thead class="text-xs text-gray-700 uppercase bg-gray-100">
+                                <tr>
+                                    <th scope="col" class="px-6 py-3">SKU</th>
+                                    <th scope="col" class="px-6 py-3">اسم المنتج</th>
+                                    <th scope="col" class="px-6 py-3">التكلفة الإجمالية</th>
+                                    <th scope="col" class="px-6 py-3">سعر البيع</th>
+                                    <th scope="col" class="px-6 py-3">هامش الربح</th>
+                                    <th scope="col" class="px-6 py-3"></th>
+                                </tr>
+                            </thead>
+                            <tbody id="products-table-body">
+                            </tbody>
+                        </table>
+                    </div>
+                </section>
+                
+                <section class="bg-white p-6 rounded-lg shadow-sm">
+                    <h2 class="text-xl font-bold text-gray-700 mb-4">إضافة منتج جديد</h2>
+                    <form id="product-form">
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                                <label for="product-name" class="block text-sm font-medium text-gray-700">اسم المنتج</label>
+                                <input type="text" id="product-name" class="mt-1 p-2 w-full border rounded-md bg-gray-50 focus:ring-2 focus:ring-gray-300" required>
+                            </div>
+                            <div>
+                                <label for="product-sku" class="block text-sm font-medium text-gray-700">SKU (سيتم إنشاؤه تلقائيًا)</label>
+                                <input type="text" id="product-sku" class="mt-1 p-2 w-full border rounded-md bg-gray-100 text-gray-500" disabled>
+                            </div>
+                            <div class="md:col-span-2">
+                                <label for="selling-price" class="block text-sm font-medium text-gray-700">سعر البيع</label>
+                                <input type="number" id="selling-price" min="0" step="0.01" class="mt-1 p-2 w-full border rounded-md bg-gray-50 focus:ring-2 focus:ring-gray-300" required>
+                            </div>
+                        </div>
+                        
+                        <h3 class="text-lg font-bold text-gray-700 mt-6 mb-2">مكونات المنتج (الأجزاء)</h3>
+                        <div id="product-parts-container">
+                            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-2">
+                                <div class="md:col-span-2">
+                                    <label for="part-select-0" class="block text-sm font-medium text-gray-700">اسم الجزء</label>
+                                    <select id="part-select-0" class="mt-1 p-2 w-full border rounded-md bg-gray-50 focus:ring-2 focus:ring-gray-300">
+                                        <!-- Options will be populated by JS -->
+                                    </select>
+                                </div>
+                                <div>
+                                    <label for="part-quantity-0" class="block text-sm font-medium text-gray-700">الكمية</label>
+                                    <input type="number" id="part-quantity-0" min="1" value="1" class="mt-1 p-2 w-full border rounded-md bg-gray-50 focus:ring-2 focus:ring-gray-300">
+                                </div>
+                            </div>
+                        </div>
+                        <button type="button" id="add-part-btn" class="mt-4 text-sm bg-gray-200 text-gray-700 py-1 px-3 rounded-md hover:bg-gray-300 transition-colors">+ إضافة جزء</button>
+                        
+                        <div class="mt-6 flex justify-between items-center text-lg font-bold">
+                             <span>التكلفة الإجمالية: <span id="new-product-cost">0.00</span> جنيه</span>
+                            <button type="submit" class="bg-blue-600 text-white py-2 px-6 rounded-md hover:bg-blue-700 transition-colors">إضافة المنتج</button>
+                        </div>
+                    </form>
+                </section>
+            </div>
+
+            <div id="content-po" class="hidden">
+                 <div id="po-section" class="bg-white p-8 rounded-lg shadow-lg max-w-4xl mx-auto">
+                    <header class="flex justify-between items-start mb-8 border-b pb-4">
+                        <div>
+                            <h2 class="text-2xl font-bold text-gray-800">أمر شراء (Purchase Order)</h2>
+                            <input type="text" placeholder="[اسم البراند الخاص بك]" class="text-lg font-semibold border-b-2 border-transparent focus:border-gray-300 outline-none">
+                            <input type="text" placeholder="[عنوانك]" class="text-sm text-gray-500 border-b-2 border-transparent focus:border-gray-300 outline-none w-full">
+                            <input type="text" placeholder="[معلومات التواصل]" class="text-sm text-gray-500 border-b-2 border-transparent focus:border-gray-300 outline-none w-full">
+                        </div>
+                        <div class="text-right">
+                             <div class="flex items-center justify-end">
+                                <label for="po-number" class="font-semibold ml-2">رقم أمر الشراء:</label>
+                                <input id="po-number" type="text" value="PO-001" class="text-lg font-mono p-1 rounded-md border text-right w-32">
+                            </div>
+                            <div class="flex items-center justify-end mt-2">
+                                <label for="po-date" class="font-semibold ml-2">التاريخ:</label>
+                                <input id="po-date" type="date" class="text-lg p-1 rounded-md border text-right w-40">
+                            </div>
+                        </div>
+                    </header>
+                    
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8">
+                        <div class="bg-gray-50 p-4 rounded-md">
+                            <h3 class="font-bold text-gray-700 mb-2">معلومات المورد:</h3>
+                            <input type="text" placeholder="اسم المورد" class="w-full p-1 mb-1 bg-transparent border-b outline-none focus:border-gray-400">
+                            <input type="text" placeholder="عنوان المورد" class="w-full p-1 mb-1 bg-transparent border-b outline-none focus:border-gray-400">
+                            <input type="text" placeholder="هاتف المورد" class="w-full p-1 bg-transparent border-b outline-none focus:border-gray-400">
+                        </div>
+                         <div class="bg-gray-50 p-4 rounded-md">
+                            <h3 class="font-bold text-gray-700 mb-2">الشحن إلى:</h3>
+                            <input type="text" placeholder="اسم المستلم" class="w-full p-1 mb-1 bg-transparent border-b outline-none focus:border-gray-400">
+                            <input type="text" placeholder="عنوان الشحن" class="w-full p-1 mb-1 bg-transparent border-b outline-none focus:border-gray-400">
+                        </div>
+                    </div>
+
+                    <h3 class="text-lg font-bold text-gray-700 mb-2">تفاصيل الطلبية:</h3>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-sm">
+                            <thead class="text-xs text-gray-700 uppercase bg-gray-100">
+                                <tr>
+                                    <th class="px-4 py-2 w-1/2">وصف البند</th>
+                                    <th class="px-4 py-2">الكمية</th>
+                                    <th class="px-4 py-2">سعر الوحدة</th>
+                                    <th class="px-4 py-2">الإجمالي</th>
+                                    <th class="px-4 py-2"></th>
+                                </tr>
+                            </thead>
+                            <tbody id="po-items-body">
+                            </tbody>
+                        </table>
+                    </div>
+                    <button id="add-po-item" class="mt-4 text-sm bg-gray-200 text-gray-700 py-1 px-3 rounded-md hover:bg-gray-300 transition-colors">+ إضافة بند</button>
+
+                    <div class="flex justify-end mt-8">
+                        <div class="w-full md:w-1/2 lg:w-1/3">
+                            <div class="flex justify-between py-2 border-b">
+                                <span class="font-semibold">المجموع الفرعي:</span>
+                                <span id="po-subtotal">0.00 جنيه</span>
+                            </div>
+                            <div class="flex justify-between items-center py-2 border-b">
+                                <label for="po-tax" class="font-semibold">الضريبة (%):</label>
+                                <input type="number" id="po-tax" value="0" min="0" class="w-20 p-1 text-right border rounded-md">
+                            </div>
+                             <div class="flex justify-between py-2 font-bold text-lg text-gray-800">
+                                <span>المجموع النهائي:</span>
+                                <span id="po-total">0.00 جنيه</span>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="mt-8 border-t pt-4">
+                        <label for="po-terms" class="font-bold text-gray-700">شروط الدفع:</label>
+                        <input id="po-terms" type="text" value="الدفع خلال 30 يومًا من تاريخ الفاتورة" class="w-full mt-1 p-1 border-b outline-none focus:border-gray-400">
+                    </div>
+
+                    <div class="text-center mt-8">
+                        <button id="printPOButton" class="bg-gray-700 text-white py-2 px-8 rounded-md hover:bg-gray-800 transition-colors">طباعة أمر الشراء</button>
+                    </div>
+                </div>
+            </div>
+
+            <div id="content-data" class="hidden">
+                <div class="bg-white p-6 rounded-lg shadow-sm max-w-xl mx-auto text-center">
+                    <h2 class="text-xl font-bold text-gray-700 mb-4">إدارة بيانات التطبيق</h2>
+                    <p class="text-gray-600 mb-4">تُحفظ البيانات تلقائياً في متصفحك. استخدم الخيارات التالية لإدارتها.</p>
+                    <div class="flex flex-col space-y-4">
+                        <button id="export-data-btn" class="bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 transition-colors">
+                            تصدير البيانات (JSON)
+                        </button>
+                        <button id="clear-data-btn" class="bg-red-600 text-white py-2 px-4 rounded-md hover:bg-red-700 transition-colors">
+                            مسح كل البيانات
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            // --- DOM Elements ---
+            const tabDashboard = document.getElementById('tab-dashboard');
+            const tabProducts = document.getElementById('tab-products');
+            const tabPo = document.getElementById('tab-po');
+            const tabData = document.getElementById('tab-data');
+            const contentDashboard = document.getElementById('content-dashboard');
+            const contentProducts = document.getElementById('content-products');
+            const contentPo = document.getElementById('content-po');
+            const contentData = document.getElementById('content-data');
+            
+            // --- Pre-loaded Data from CSV files ---
+            // Data Base.csv (not directly used for now, as Modules has calculated costs)
+            const sheetData = [
+                { "Sheet Type": "Plywood - Square", "Sheet Size W (cm)": 152.5, "Sheet Size L (cm)": 152.5, "Sheet Area (m²)": 2.325625, "Cost per Sheet": 1600, "Cost per m²": 687.9871002, "CNC Cost per m²": 107.4979844, "Finish Cost per m²": 193.4963719, "Painting Cost per m²": 257.9951626 }
+            ];
+
+            // Modules.csv
+            const modules = [
+                { "Part ID": 1, "Part Name": "B Table Leg", "Cost per Part": 49.87906477 },
+                { "Part ID": 2, "Part Name": "A Table Leg", "Cost per Part": 168.3418436 },
+                { "Part ID": 3, "Part Name": "B Table Top", "Cost per Part": 798.0650363 },
+                { "Part ID": 4, "Part Name": "A Table Top", "Cost per Part": 199.5162591 }
+            ];
+
+            // Products.csv
+            const initialProducts = [
+                { "SKU": "RST-404045", "Product Name": "Rukun Side Table", "Total Cost": 536.1999463, "Selling Price": 1850, "Profit Margin": 0.7101621912, "Parts": [{"Part ID": 2, "Quantity": 2}, {"Part ID": 1, "Quantity": 1}] },
+                { "SKU": "SCT-404080", "Product Name": "Sokoon Coffee Table", "Total Cost": 1795.646332, "Selling Price": 5299, "Profit Margin": 0.6611348685, "Parts": [{"Part ID": 4, "Quantity": 4}, {"Part ID": 2, "Quantity": 2}] },
+                { "SKU": "WCT-1008040", "Product Name": "Wanas Coffee Table", "Total Cost": 0, "Selling Price": 0, "Profit Margin": 0, "Parts": [] },
+                { "SKU": "RTT-1504230", "Product Name": "Rakaz TV Table 150 cm", "Total Cost": 0, "Selling Price": 0, "Profit Margin": 0, "Parts": [] }
+            ];
+            
+            // --- Data Variables ---
+            let expenses = [];
+            let revenues = [];
+            let products = [];
+            let poItems = [{}];
+            let balanceChart;
+            let nextSKUNumber = 1;
+
+            // --- Initial Setup ---
+            const expenseForm = document.getElementById('expense-form');
+            const revenueForm = document.getElementById('revenue-form');
+            const productForm = document.getElementById('product-form');
+            const exportDataBtn = document.getElementById('export-data-btn');
+            const clearDataBtn = document.getElementById('clear-data-btn');
+
+            // Function to load data from Local Storage
+            function loadData() {
+                try {
+                    const storedExpenses = localStorage.getItem('basit_expenses');
+                    const storedRevenues = localStorage.getItem('basit_revenues');
+                    const storedProducts = localStorage.getItem('basit_products');
+                    
+                    if (storedExpenses) {
+                        expenses = JSON.parse(storedExpenses);
+                    }
+                    if (storedRevenues) {
+                        revenues = JSON.parse(storedRevenues);
+                    }
+                    if (storedProducts) {
+                        products = JSON.parse(storedProducts);
+                    } else {
+                        // Use initial data if no data is stored
+                        products = initialProducts;
+                    }
+                } catch (e) {
+                    console.error("Failed to load data from localStorage", e);
+                    products = initialProducts; // Fallback to initial data
+                }
+            }
+
+            // Function to save data to Local Storage
+            function saveData() {
+                try {
+                    localStorage.setItem('basit_expenses', JSON.stringify(expenses));
+                    localStorage.setItem('basit_revenues', JSON.stringify(revenues));
+                    localStorage.setItem('basit_products', JSON.stringify(products));
+                } catch (e) {
+                    console.error("Failed to save data to localStorage", e);
+                }
+            }
+
+            // Function to generate a new SKU
+            function generateSKU() {
+                let skuBase = 'BAS'; // "Basit"
+                // Find the highest existing SKU number to avoid duplicates
+                const highestSKU = products.reduce((max, p) => {
+                    const num = parseInt(p.SKU.split('-')[1]);
+                    return num > max ? num : max;
+                }, 0);
+                nextSKUNumber = highestSKU + 1;
+                const skuNumber = String(nextSKUNumber).padStart(6, '0');
+                return `${skuBase}-${skuNumber}`;
+            }
+
+            // Function to calculate product cost based on parts
+            function calculateProductCost(parts) {
+                let totalCost = 0;
+                parts.forEach(part => {
+                    const module = modules.find(m => m["Part ID"] == part["Part ID"]);
+                    if (module) {
+                        totalCost += (module["Cost per Part"] * part.Quantity);
+                    }
+                });
+                return totalCost;
+            }
+
+            // Function to update the dashboard display
+            function updateDashboard() {
+                const totalRevenues = revenues.reduce((sum, item) => sum + item.amount, 0);
+                const totalExpenses = expenses.reduce((sum, item) => sum + item.amount, 0);
+                const netProfit = totalRevenues - totalExpenses;
+
+                document.getElementById('total-revenues-display').textContent = `${totalRevenues.toFixed(2)} جنيه`;
+                document.getElementById('total-expenses-display').textContent = `${totalExpenses.toFixed(2)} جنيه`;
+                
+                const netProfitDisplay = document.getElementById('net-profit-display');
+                netProfitDisplay.textContent = `${netProfit.toFixed(2)} جنيه`;
+                netProfitDisplay.classList.remove('text-green-600', 'text-red-600', 'text-gray-800');
+                if (netProfit > 0) {
+                    netProfitDisplay.classList.add('text-green-600');
+                } else if (netProfit < 0) {
+                    netProfitDisplay.classList.add('text-red-600');
+                } else {
+                    netProfitDisplay.classList.add('text-gray-800');
+                }
+
+                renderTransactions();
+                updateChart();
+            }
+
+            // Function to render transactions in the table
+            function renderTransactions() {
+                const tableBody = document.getElementById('transactions-table-body');
+                tableBody.innerHTML = '';
+                
+                const allTransactions = [...expenses, ...revenues];
+                
+                if (allTransactions.length === 0) {
+                    tableBody.innerHTML = '<tr class="bg-white border-b"><td colspan="6" class="px-6 py-4 text-center">لا توجد حركات مالية مسجلة بعد.</td></tr>';
+                    return;
+                }
+
+                allTransactions.sort((a, b) => new Date(b.date) - new Date(a.date));
+
+                allTransactions.forEach(item => {
+                    const row = document.createElement('tr');
+                    row.className = 'bg-white border-b hover:bg-gray-50';
+                    const amountClass = item.type === 'revenue' ? 'text-green-600' : 'text-red-600';
+                    row.innerHTML = `
+                        <td class="px-6 py-4">${item.date}</td>
+                        <td class="px-6 py-4 font-medium text-gray-900">${item.description}</td>
+                        <td class="px-6 py-4">${item.type === 'revenue' ? 'إيراد' : 'مصروف'}</td>
+                        <td class="px-6 py-4">${item.category}</td>
+                        <td class="px-6 py-4 font-bold ${amountClass}">${item.amount.toFixed(2)} جنيه</td>
+                        <td class="px-6 py-4 text-right">
+                            <button class="text-red-600 hover:text-red-900" data-id="${item.id}" data-type="${item.type}">حذف</button>
+                        </td>
+                    `;
+                    row.querySelector('button').addEventListener('click', function() {
+                        const id = parseInt(this.getAttribute('data-id'));
+                        const type = this.getAttribute('data-type');
+                        
+                        if (type === 'revenue') {
+                            revenues = revenues.filter(r => r.id !== id);
+                        } else {
+                            expenses = expenses.filter(e => e.id !== id);
+                        }
+                        
+                        saveData();
+                        updateDashboard();
+                    });
+                    tableBody.appendChild(row);
+                });
+            }
+
+            // Function to render products table
+            function renderProducts() {
+                const tableBody = document.getElementById('products-table-body');
+                tableBody.innerHTML = '';
+                
+                if (products.length === 0) {
+                    tableBody.innerHTML = '<tr class="bg-white border-b"><td colspan="6" class="px-6 py-4 text-center">لا توجد منتجات مسجلة بعد.</td></tr>';
+                    return;
+                }
+
+                products.forEach((product, index) => {
+                    const totalCost = calculateProductCost(product.Parts || []);
+                    const profitMargin = (product["Selling Price"] > 0) ? ((product["Selling Price"] - totalCost) / product["Selling Price"]) : 0;
+                    
+                    const row = document.createElement('tr');
+                    row.className = 'bg-white border-b hover:bg-gray-50';
+                    row.innerHTML = `
+                        <td class="px-6 py-4 font-mono">${product.SKU}</td>
+                        <td class="px-6 py-4 font-medium text-gray-900">${product["Product Name"]}</td>
+                        <td class="px-6 py-4">${totalCost.toFixed(2)} جنيه</td>
+                        <td class="px-6 py-4 font-bold">${product["Selling Price"].toFixed(2)} جنيه</td>
+                        <td class="px-6 py-4">${(profitMargin * 100).toFixed(2)}%</td>
+                        <td class="px-6 py-4 text-right">
+                            <button class="text-red-600 hover:text-red-900" data-index="${index}">حذف</button>
+                        </td>
+                    `;
+                    row.querySelector('button').addEventListener('click', function() {
+                        const index = this.getAttribute('data-index');
+                        products.splice(index, 1);
+                        saveData();
+                        renderProducts();
+                    });
+                    tableBody.appendChild(row);
+                });
+            }
+
+            // Function to update the bar chart
+            function updateChart() {
+                const monthlyData = {};
+                const now = new Date();
+                const currentMonth = now.getMonth();
+                const currentYear = now.getFullYear();
+
+                for (let i = 0; i < 6; i++) {
+                    let month = (currentMonth - i + 12) % 12;
+                    let year = currentYear;
+                    if (currentMonth - i < 0) year--;
+                    const monthName = new Date(year, month).toLocaleString('ar', { month: 'long', year: 'numeric' });
+                    monthlyData[monthName] = { revenue: 0, expense: 0 };
+                }
+
+                expenses.forEach(exp => {
+                    const date = new Date(exp.date);
+                    const monthName = date.toLocaleString('ar', { month: 'long', year: 'numeric' });
+                    if (monthlyData[monthName]) {
+                        monthlyData[monthName].expense += exp.amount;
+                    }
+                });
+
+                revenues.forEach(rev => {
+                    const date = new Date(rev.date);
+                    const monthName = date.toLocaleString('ar', { month: 'long', year: 'numeric' });
+                    if (monthlyData[monthName]) {
+                        monthlyData[monthName].revenue += rev.amount;
+                    }
+                });
+                
+                const labels = Object.keys(monthlyData);
+                const revenueData = labels.map(label => monthlyData[label].revenue);
+                const expenseData = labels.map(label => monthlyData[label].expense);
+
+                if (balanceChart) {
+                    balanceChart.data.labels = labels;
+                    balanceChart.data.datasets[0].data = revenueData;
+                    balanceChart.data.datasets[1].data = expenseData;
+                    balanceChart.update();
+                } else {
+                    const ctx = document.getElementById('balanceChart').getContext('2d');
+                    balanceChart = new Chart(ctx, {
+                        type: 'bar',
+                        data: {
+                            labels: labels,
+                            datasets: [{
+                                label: 'الإيرادات',
+                                data: revenueData,
+                                backgroundColor: 'rgba(75, 192, 192, 0.7)',
+                                borderColor: 'rgba(75, 192, 192, 1)',
+                                borderWidth: 1
+                            }, {
+                                label: 'المصروفات',
+                                data: expenseData,
+                                backgroundColor: 'rgba(255, 99, 132, 0.7)',
+                                borderColor: 'rgba(255, 99, 132, 1)',
+                                borderWidth: 1
+                            }]
+                        },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            plugins: {
+                                legend: {
+                                    position: 'top',
+                                    labels: {
+                                        font: { family: "'Alexandria', sans-serif" }
+                                    }
+                                }
+                            },
+                            scales: {
+                                x: {
+                                    stacked: false,
+                                    ticks: { font: { family: "'Alexandria', sans-serif" } }
+                                },
+                                y: {
+                                    stacked: false,
+                                    beginAtZero: true,
+                                    ticks: { font: { family: "'Alexandria', sans-serif" } }
+                                }
+                            }
+                        }
+                    });
+                }
+            }
+
+            // Function to export all data to a JSON file
+            function exportData() {
+                const dataToExport = {
+                    expenses: expenses,
+                    revenues: revenues,
+                    products: products,
+                    exportDate: new Date().toISOString()
+                };
+                const dataStr = JSON.stringify(dataToExport, null, 2);
+                const dataUri = 'data:application/json;charset=utf-8,'+ encodeURIComponent(dataStr);
+                
+                const exportFileDefaultName = 'basit_accounting_data.json';
+                
+                const linkElement = document.createElement('a');
+                linkElement.setAttribute('href', dataUri);
+                linkElement.setAttribute('download', exportFileDefaultName);
+                linkElement.click();
+            }
+
+            // Function to clear all data
+            function clearAllData() {
+                const modal = document.createElement('div');
+                modal.className = 'fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full flex items-center justify-center z-50';
+                modal.innerHTML = `
+                    <div class="bg-white p-6 rounded-lg shadow-xl text-center max-w-sm">
+                        <h3 class="text-xl font-bold mb-4">مسح البيانات</h3>
+                        <p class="mb-6">هل أنت متأكد من مسح جميع البيانات؟ هذا الإجراء لا يمكن التراجع عنه.</p>
+                        <div class="flex justify-center space-x-4">
+                            <button id="confirm-clear" class="bg-red-600 text-white py-2 px-4 rounded-md hover:bg-red-700 transition-colors">تأكيد</button>
+                            <button id="cancel-clear" class="bg-gray-300 text-gray-800 py-2 px-4 rounded-md hover:bg-gray-400 transition-colors">إلغاء</button>
+                        </div>
+                    </div>
+                `;
+                document.body.appendChild(modal);
+
+                document.getElementById('confirm-clear').addEventListener('click', () => {
+                    localStorage.removeItem('basit_expenses');
+                    localStorage.removeItem('basit_revenues');
+                    localStorage.removeItem('basit_products');
+                    expenses = [];
+                    revenues = [];
+                    products = initialProducts; // Reset to initial products
+                    updateDashboard();
+                    renderProducts();
+                    modal.remove();
+                    
+                    const msgBox = document.createElement('div');
+                    msgBox.className = 'fixed top-4 left-1/2 -translate-x-1/2 bg-green-500 text-white p-3 rounded-md shadow-lg z-50';
+                    msgBox.textContent = 'تم مسح جميع البيانات بنجاح.';
+                    document.body.appendChild(msgBox);
+                    setTimeout(() => msgBox.remove(), 3000);
+                });
+
+                document.getElementById('cancel-clear').addEventListener('click', () => {
+                    modal.remove();
+                });
+            }
+
+            // --- Event Listeners ---
+            tabDashboard.addEventListener('click', () => switchTab('dashboard'));
+            tabProducts.addEventListener('click', () => switchTab('products'));
+            tabPo.addEventListener('click', () => switchTab('po'));
+            tabData.addEventListener('click', () => switchTab('data'));
+
+            expenseForm.addEventListener('submit', function (e) {
+                e.preventDefault();
+                const newExpense = {
+                    id: Date.now(),
+                    date: document.getElementById('exp-date').value,
+                    description: document.getElementById('exp-desc').value,
+                    category: document.getElementById('exp-category').value,
+                    amount: parseFloat(document.getElementById('exp-amount').value),
+                    type: 'expense'
+                };
+                expenses.push(newExpense);
+                saveData();
+                updateDashboard();
+                expenseForm.reset();
+            });
+
+            revenueForm.addEventListener('submit', function (e) {
+                e.preventDefault();
+                const newRevenue = {
+                    id: Date.now(),
+                    date: document.getElementById('rev-date').value,
+                    description: document.getElementById('rev-desc').value,
+                    category: document.getElementById('rev-category').value,
+                    amount: parseFloat(document.getElementById('rev-amount').value),
+                    type: 'revenue'
+                };
+                revenues.push(newRevenue);
+                saveData();
+                updateDashboard();
+                revenueForm.reset();
+            });
+            
+            productForm.addEventListener('submit', function (e) {
+                e.preventDefault();
+                const productName = document.getElementById('product-name').value;
+                const sellingPrice = parseFloat(document.getElementById('selling-price').value);
+                
+                const parts = [];
+                document.querySelectorAll('#product-parts-container .grid').forEach(partRow => {
+                    const partId = partRow.querySelector('select').value;
+                    const quantity = parseInt(partRow.querySelector('input').value);
+                    if (partId && quantity > 0) {
+                        parts.push({"Part ID": parseInt(partId), "Quantity": quantity});
+                    }
+                });
+
+                const newProduct = {
+                    "SKU": generateSKU(),
+                    "Product Name": productName,
+                    "Total Cost": calculateProductCost(parts),
+                    "Selling Price": sellingPrice,
+                    "Profit Margin": (sellingPrice > 0) ? ((sellingPrice - calculateProductCost(parts)) / sellingPrice) : 0,
+                    "Parts": parts
+                };
+                
+                products.push(newProduct);
+                saveData();
+                renderProducts();
+                document.getElementById('new-product-cost').textContent = "0.00";
+                productForm.reset();
+                document.getElementById('product-parts-container').innerHTML = '';
+                addPartRow();
+            });
+
+            // Add new part row dynamically
+            document.getElementById('add-part-btn').addEventListener('click', addPartRow);
+
+            // Update new product cost on part change
+            document.getElementById('product-parts-container').addEventListener('input', updateNewProductCost);
+            
+            function updateNewProductCost() {
+                const parts = [];
+                document.querySelectorAll('#product-parts-container .grid').forEach(partRow => {
+                    const partId = partRow.querySelector('select').value;
+                    const quantity = parseInt(partRow.querySelector('input').value);
+                    if (partId && quantity > 0) {
+                        parts.push({"Part ID": parseInt(partId), "Quantity": quantity});
+                    }
+                });
+                const cost = calculateProductCost(parts);
+                document.getElementById('new-product-cost').textContent = cost.toFixed(2);
+            }
+
+            function addPartRow() {
+                const container = document.getElementById('product-parts-container');
+                const newIndex = container.children.length;
+                
+                const partRow = document.createElement('div');
+                partRow.className = 'grid grid-cols-1 md:grid-cols-3 gap-4 mb-2';
+                partRow.innerHTML = `
+                    <div class="md:col-span-2">
+                        <label for="part-select-${newIndex}" class="block text-sm font-medium text-gray-700 sr-only">اسم الجزء</label>
+                        <select id="part-select-${newIndex}" class="mt-1 p-2 w-full border rounded-md bg-gray-50 focus:ring-2 focus:ring-gray-300">
+                            <option value="">-- اختر جزء --</option>
+                            ${modules.map(module => `<option value="${module["Part ID"]}">${module["Part Name"]}</option>`).join('')}
+                        </select>
+                    </div>
+                    <div>
+                        <label for="part-quantity-${newIndex}" class="block text-sm font-medium text-gray-700 sr-only">الكمية</label>
+                        <input type="number" id="part-quantity-${newIndex}" min="1" value="1" class="mt-1 p-2 w-full border rounded-md bg-gray-50 focus:ring-2 focus:ring-gray-300">
+                    </div>
+                    <div class="flex items-center justify-end">
+                        <button type="button" class="remove-part-btn text-red-600 hover:text-red-800">حذف</button>
+                    </div>
+                `;
+                container.appendChild(partRow);
+                
+                // Add remove button event listener
+                partRow.querySelector('.remove-part-btn').addEventListener('click', () => {
+                    partRow.remove();
+                    updateNewProductCost();
+                });
+            }
+
+            exportDataBtn.addEventListener('click', exportData);
+            clearDataBtn.addEventListener('click', clearAllData);
+            
+            // PO-specific logic (unchanged from previous version)
+            function renderPOItems() {
+                const poBody = document.getElementById('po-items-body');
+                poBody.innerHTML = '';
+                poItems.forEach((item, index) => {
+                    const row = document.createElement('tr');
+                    row.className = 'border-b';
+                    row.innerHTML = `
+                        <td class="px-2 py-2"><input type="text" placeholder="اسم المنتج أو الخدمة" class="w-full p-1 bg-transparent outline-none focus:bg-gray-100 rounded-md" data-index="${index}" data-field="description" value="${item.description || ''}"></td>
+                        <td class="px-2 py-2"><input type="number" value="${item.quantity || 1}" min="1" class="w-20 p-1 text-center border rounded-md" data-index="${index}" data-field="quantity"></td>
+                        <td class="px-2 py-2"><input type="number" value="${item.price || 0}" min="0" step="0.01" class="w-24 p-1 text-center border rounded-md" data-index="${index}" data-field="price"></td>
+                        <td class="px-2 py-2 text-center font-semibold" data-index="${index}" data-field="total">${((item.quantity || 1) * (item.price || 0)).toFixed(2)}</td>
+                        <td class="px-2 py-2 text-center"><button class="text-gray-500 hover:text-red-600" data-index="${index}">&times;</button></td>
+                    `;
+                    poBody.appendChild(row);
+                });
+                addPOEventListeners();
+                calculatePOTotals();
+            }
+            
+            function addPOEventListeners() {
+                document.querySelectorAll('#po-items-body input').forEach(input => {
+                    input.addEventListener('input', (e) => {
+                        const index = e.target.getAttribute('data-index');
+                        const field = e.target.getAttribute('data-field');
+                        poItems[index][field] = e.target.value;
+                        calculatePOTotals();
+                    });
+                });
+                document.querySelectorAll('#po-items-body button').forEach(button => {
+                    button.addEventListener('click', (e) => {
+                        if (poItems.length > 1) {
+                            const index = e.target.getAttribute('data-index');
+                            poItems.splice(index, 1);
+                            renderPOItems();
+                        }
+                    });
+                });
+            }
+
+            function calculatePOTotals() {
+                let subtotal = 0;
+                poItems.forEach((item, index) => {
+                    const quantity = parseFloat(item.quantity) || 0;
+                    const price = parseFloat(item.price) || 0;
+                    const total = quantity * price;
+                    subtotal += total;
+                    const totalElement = document.querySelector(`[data-field='total'][data-index='${index}']`);
+                    if (totalElement) {
+                        totalElement.textContent = total.toFixed(2);
+                    }
+                });
+
+                document.getElementById('po-subtotal').textContent = `${subtotal.toFixed(2)} جنيه`;
+                const taxPercent = parseFloat(document.getElementById('po-tax').value) || 0;
+                const taxAmount = subtotal * (taxPercent / 100);
+                const finalTotal = subtotal + taxAmount;
+                document.getElementById('po-total').textContent = `${finalTotal.toFixed(2)} جنيه`;
+            }
+
+            document.getElementById('add-po-item').addEventListener('click', () => {
+                poItems.push({});
+                renderPOItems();
+            });
+            
+            document.getElementById('po-tax').addEventListener('input', calculatePOTotals);
+            
+            document.getElementById('printPOButton').addEventListener('click', () => {
+                window.print();
+            });
+            
+            document.getElementById('po-date').valueAsDate = new Date();
+
+            // Function to handle tab switching
+            function switchTab(activeTab) {
+                const tabs = { dashboard: tabDashboard, products: tabProducts, po: tabPo, data: tabData };
+                const contents = { dashboard: contentDashboard, products: contentProducts, po: contentPo, data: contentData };
+
+                for (const tab in tabs) {
+                    if (tab === activeTab) {
+                        tabs[tab].classList.add('tab-active');
+                        tabs[tab].classList.remove('tab-inactive');
+                        contents[tab].classList.remove('hidden');
+                    } else {
+                        tabs[tab].classList.add('tab-inactive');
+                        tabs[tab].classList.remove('tab-active');
+                        contents[tab].classList.add('hidden');
+                    }
+                }
+            }
+
+            // Initial calls
+            loadData();
+            updateDashboard();
+            renderProducts();
+            renderPOItems();
+            addPartRow(); // Add the first row for product parts
+            switchTab('dashboard');
+        });
+    </script>
+</body>
+</html>
